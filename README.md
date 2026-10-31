@@ -6,6 +6,10 @@ colour touching for a moment melt away and lighten their side — which may
 tip the other way. Lose all three hearts (blocks falling into the void) or
 let the plank lean past 35° for more than 1.5 seconds and the game is over.
 
+Small fixed **cleats** stud the beam: blocks settle into bays between them,
+so resting columns keep their footing instead of sliding away with every
+tilt (added in v1.1 after first player feedback).
+
 Self-contained: one `index.html`, no server, no external asset. Physics by
 [Matter.js](https://brm.io/matter-js/) (v0.20.0, MIT, inlined with its
 license notice; see `THIRD-PARTY-LICENSES.md`).

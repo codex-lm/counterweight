@@ -222,13 +222,17 @@ var SETTINGS = {
     baseLength: 640,        // level 1 length (shrinks with levels, spec §5)
     thickness: 22,
     lipHeight: 20,
-    density: 0.0008,        // beam inertia: heavy enough to tilt readably
+    density: 0.001,         // beam inertia: heavy enough to tilt readably
     friction: 0.55,
     frictionStatic: 1.0,
-    staticTorque: 0.5,      // dead-zone friction at the pivot
-    viscousTorque: 80,      // viscous damping at the pivot (per rad/step)
+    staticTorque: 0.85,     // dead-zone friction at the pivot (forgiving small imbalances)
+    viscousTorque: 105,     // viscous damping at the pivot (per rad/step)
+    maxOmega: 0.0045,       // angular speed cap (~15°/s): no whiplash returns
     maxAngleDeg: 50,        // mechanical stop
-    slop: 0.06
+    slop: 0.06,
+    // fixed cleats on the beam: resting columns get foundations instead of
+    // sliding away with every tilt (player feedback, 2026-10-31)
+    cleat: { every: 2.2, width: 8, height: 7 }, // 'every' in block sizes
   },
   blocks: {
     size: 44,
@@ -236,7 +240,7 @@ var SETTINGS = {
     leadDensity: 0.0028,    // lead, mass ~3
     balloonDensity: 0.0006,
     friction: 0.85,         // blocks start sliding past ~40°, above the 35° tilt limit
-    frictionStatic: 1.8,
+    frictionStatic: 3.4,    // columns shear only well past the tilt threshold
     restitution: 0,
     frictionAir: 0.008,
     sleepThreshold: 35,
@@ -424,6 +428,19 @@ function createGame(opts) {
       M.Bodies.rectangle(pivot.x - len / 2, pivot.y - S.plank.thickness / 2 - S.plank.lipHeight / 2, 10, S.plank.lipHeight, {}),
       M.Bodies.rectangle(pivot.x + len / 2, pivot.y - S.plank.thickness / 2 - S.plank.lipHeight / 2, 10, S.plank.lipHeight, {})
     ];
+    // cleats: offset by half a step so the centre bay stays clear, plus one
+    // near each lip so the outer bays hold exactly one block (no dead zone,
+    // no narrow trap bay either)
+    var step = S.plank.cleat.every * BS;
+    var m = Math.floor((len / 2 - 46) / step);
+    var cleatsX = [];
+    for (var k = -m; k <= m - 1; k++) cleatsX.push((k + 0.5) * step);
+    var endBay = BS + S.plank.cleat.width / 2 + 12;
+    var cxEnd = len / 2 - 10 - endBay + S.plank.cleat.width / 2; // bay ≈ one block wide
+    cleatsX.push(-cxEnd); cleatsX.push(cxEnd);
+    for (var ci = 0; ci < cleatsX.length; ci++) {
+      parts.push(M.Bodies.rectangle(pivot.x + cleatsX[ci], pivot.y - S.plank.thickness / 2 - S.plank.cleat.height / 2 + 1, S.plank.cleat.width, S.plank.cleat.height, {}));
+    }
     var body = M.Body.create({
       parts: parts,
       density: S.plank.density, isStatic: true,
@@ -459,6 +476,9 @@ function createGame(opts) {
     else if (Math.abs(drive) < P.staticTorque) drive = 0; // dead zone holds small imbalances
     drive -= P.viscousTorque * plankKin.omega;
     plankKin.omega += drive / inertia;
+    var om = plankKin.omega, omCap = P.maxOmega;
+    if (om > omCap) plankKin.omega = omCap;
+    else if (om < -omCap) plankKin.omega = -omCap;
     var maxA = P.maxAngleDeg * Math.PI / 180;
     var theta = plankKin.theta + plankKin.omega;
     if (theta > maxA) { theta = maxA; plankKin.omega *= -0.25; }
@@ -517,8 +537,8 @@ function createGame(opts) {
   var balloonActive = false, lastWasBalloon = false;
   var tutorial = !!opts.tutorial;
   var autoDropEnabled = opts.autoDrop !== false; // tests drive drops themselves
-  // tutorial pair sits at proper touching distance; the target lands ON it
-  var tutoX1 = pivot.x - 2.4 * BS;
+  // tutorial pair sits inside the bay left of centre; the target lands ON it
+  var tutoX1 = pivot.x - S.plank.cleat.every * BS - 19;
   var tuto = tutorial
     ? { phase: 'aim', placedAt: 0, driftDelay: 2500, targetX: tutoX1 }
     : null;
@@ -1016,7 +1036,13 @@ function createGame(opts) {
     },
     _dropFromCursor: function () { drop(); },
     _tutoState: function () { return tuto; },
-    _setRealTime: function (ms) { realTime = ms; }
+    _setRealTime: function (ms) { realTime = ms; },
+    _setAngle: function (deg) { // test hook: force the beam angle deterministically
+      plankKin.theta = deg * Math.PI / 180;
+      plankKin.omega = 0;
+      M.Body.setAngle(plank.body, plankKin.theta);
+      M.Body.setPosition(plank.body, { x: pivot.x, y: pivot.y });
+    }
   };
   autoDropAt = params.autoDropMs + 1000; // first block gets a slightly longer leash
   return api;
@@ -1552,6 +1578,26 @@ if (typeof document !== 'undefined' && document.getElementById('cw-canvas')) (fu
       ctx.moveTo(-w / 2 + 12, gy);
       ctx.bezierCurveTo(-w / 6, gy + 2.5, w / 6, gy - 2.5, w / 2 - 12, gy);
       ctx.stroke();
+    }
+    // cleats (fixed stops: resting columns get foundations)
+    var step = S.plank.cleat.every * S.blocks.size;
+    var mCl = Math.floor((len / 2 - 46) / step);
+    ctx.fillStyle = '#5d3a1f';
+    ctx.strokeStyle = '#3d2513'; ctx.lineWidth = 1.5;
+    var cleatXs = [];
+    for (var kc = -mCl; kc <= mCl - 1; kc++) cleatXs.push((kc + 0.5) * step);
+    var endBay2 = S.blocks.size + S.plank.cleat.width / 2 + 12;
+    var cxEnd2 = len / 2 - 10 - endBay2 + S.plank.cleat.width / 2;
+    cleatXs.push(-cxEnd2); cleatXs.push(cxEnd2);
+    for (var ci = 0; ci < cleatXs.length; ci++) {
+      var cx = cleatXs[ci], cw = S.plank.cleat.width + 5, ch = S.plank.cleat.height - 1;
+      ctx.beginPath();
+      ctx.moveTo(cx - cw / 2, -h / 2 + 2);
+      ctx.lineTo(cx - cw / 4, -h / 2 - ch);
+      ctx.lineTo(cx + cw / 4, -h / 2 - ch);
+      ctx.lineTo(cx + cw / 2, -h / 2 + 2);
+      ctx.closePath();
+      ctx.fill(); ctx.stroke();
     }
     // end lips
     ctx.fillStyle = '#8a5a33';

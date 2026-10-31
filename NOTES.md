@@ -1,7 +1,46 @@
-# Delivery notes — Counterweight (2026-10-31)
+# Delivery notes — Counterweight
 
-Honest account of what was actually tested, the chosen settings, and known
-limits. Publication on LOB7 waits until Cédric has played the prototype.
+## v1.1.0 (2026-10-31, evening) — "everything slides" fix
+
+**Player feedback (Cédric, first session):** *it gets very hard quickly,
+everything slides — maybe put things on the bar?*
+
+The complaint was measured, not just felt. A beginner-level bot (completes
+colour pairs, recovers past 18°) played three 3-minute games on v1.0.0:
+
+| metric | v1.0.0 | v1.1.0 |
+| --- | --- | --- |
+| survival | 52–79 s (all defeats: hearts) | 70–97 s |
+| median slide of a resting block | 25 px | 8 px |
+| P90 slide | 92 px | 51 px |
+| beam angle RMS (calm phases) | ~15° | 2–8° |
+
+What changed (all in `SETTINGS` / `buildPlank`):
+
+- **Cleats on the beam** — small fixed wooden stops every ~2.2 blocks plus one
+  near each rim. Bays hold two columns; resting stacks get foundations and
+  genuinely sleep. Loads parked *inside* bays can even re-balance themselves
+  by sliding gently bay-to-bay; only edge-pinned loads keep their torque and
+  tip the beam — which is the readable threat the game wants.
+- **Softer balance**: wider pivot dead-zone (0.85), heavier beam (inertia
+  ×1.25), more damping, and a ~15°/s angular speed cap — no more whiplash
+  counter-swings after a big melt.
+- **Columns shear later**: static friction 3.4 (was 1.8) — piles hold well
+  past the 35° danger threshold instead of streaming off at 20°.
+- Tutorial pair now sits inside the left bay; the target lands on it.
+
+Verified: 22/22 Node tests against the shipped file (including new tests:
+mechanism defeat at 36°/1.5 s, edge-load tilt threat, cleats holding a column
+through a gentle tilt), the 6-minute bot sim (35 melts, 18 natural ×2
+cascades, chain ×5, level 4), and a browser session where blocks visibly
+settle into regular columns and sleep. Known trade-off: builds are now more
+column-shaped than free-form; bridging across bays still works (bars span
+cleats nicely).
+
+## v1.0.0 (2026-10-31) — first release
+
+Published as LOB7 edition `br_s_853f1fc5-0711-4210-9827-08ffb218700f`.
+Original delivery notes below.
 
 ## What was really tested
 
