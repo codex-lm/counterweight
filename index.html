@@ -501,6 +501,7 @@ function createGame(opts) {
 
   // --- state ------------------------------------------------------------
   var blocks = [];              // dynamic bodies with plugin.cw = spec
+  var bodyById = {};            // id → body (kept in sync from the very first block)
   var simTime = 0, realTime = 0;
   var hearts = S.rules.hearts;
   var score = 0;
@@ -516,8 +517,10 @@ function createGame(opts) {
   var balloonActive = false, lastWasBalloon = false;
   var tutorial = !!opts.tutorial;
   var autoDropEnabled = opts.autoDrop !== false; // tests drive drops themselves
+  // tutorial pair sits at proper touching distance; the target lands ON it
+  var tutoX1 = pivot.x - 2.4 * BS;
   var tuto = tutorial
-    ? { phase: 'aim', placedAt: 0, driftDelay: 2500, targetX: pivot.x - 3.3 * BS }
+    ? { phase: 'aim', placedAt: 0, driftDelay: 2500, targetX: tutoX1 }
     : null;
 
   function on(type, fn) { (events[type] = events[type] || []).push(fn); }
@@ -549,8 +552,8 @@ function createGame(opts) {
 
   // --- tutorial pre-placed pair ------------------------------------------
   if (tutorial) {
-    [-2.4, -1.4].forEach(function (k) {
-      var b = makeBlock('square', 0, pivot.x + k * BS, pivot.y - S.plank.thickness / 2 - BS / 2 + 1, 0);
+    [tutoX1, tutoX1 + 42.2].forEach(function (x) {
+      var b = makeBlock('square', 0, x, pivot.y - S.plank.thickness / 2 - BS / 2 + 1, 0);
       M.Sleeping.set(b, true);
     });
   }
@@ -612,9 +615,8 @@ function createGame(opts) {
   // adjacency is therefore GEOMETRIC: AABB overlap that shares a real face
   // (corner-to-corner diagonals are rejected), refreshed every step.
   function parentOf(b) { return b.parent || b; } // Matter composite parts → parent body
-  var bodyById = {};
   function touching(a, b) {
-    var m = 0.6, face = 4; // gap tolerance, and minimum shared-face depth
+    var m = 2.5, face = 4; // gap tolerance (Matter leaves ~1-2 px slop between settled blocks), and minimum shared-face depth
     var ox = Math.min(a.bounds.max.x, b.bounds.max.x) - Math.max(a.bounds.min.x, b.bounds.min.x);
     var oy = Math.min(a.bounds.max.y, b.bounds.max.y) - Math.max(a.bounds.min.y, b.bounds.min.y);
     return ox > -m && oy > -m && (ox > face || oy > face);
@@ -998,6 +1000,9 @@ function createGame(opts) {
         dangerMs: dangerMs, dead: dead, simTime: simTime,
         queue: queue.slice(), cursorX: cursorX, plankLen: plankLen,
         autoDropFrac: clamp((realTime - (autoDropAt - params.autoDropMs)) / params.autoDropMs, 0, 1),
+        debugBlocks: blocks.slice(0, 10).map(function (b) {
+          return { x: Math.round(b.position.x), y: Math.round(b.position.y), c: b.plugin.cw.colour, s: b.isSleeping ? 1 : 0 };
+        }),
         wind: { active: wind.activeUntil > realTime, dir: wind.dir, warn: wind.warnAt > 0 },
         perfect: { active: perfect.ms > 0, granted: perfect.granted, ms: perfect.ms },
         bodies: blocks.length + 1
@@ -1034,6 +1039,12 @@ if (typeof document !== 'undefined' && document.getElementById('cw-canvas')) (fu
   var canvas = document.getElementById('cw-canvas');
   var ctx = canvas.getContext('2d');
   var debug = /(?:\?|&)debug=1(?:&|$)/.test(location.search);
+  if (debug) {
+    self.CWErrors = [];
+    window.addEventListener('error', function (e) {
+      (self.CWErrors = self.CWErrors || []).push((e.message || 'error') + ' @' + (e.lineno || '?') + ':' + (e.colno || '?'));
+    });
+  }
 
   // ----- preferences ---------------------------------------------------
   var lang = store.get('cw.lang') || (function () {
@@ -1840,6 +1851,16 @@ if (typeof document !== 'undefined' && document.getElementById('cw-canvas')) (fu
   // ----- main loop -----------------------------------------------------------
   function loop(ts) {
     requestAnimationFrame(loop);
+    if (debug) { self.CWLOOP = (self.CWLOOP || 0) + 1; self.CWVIEW = { w: view.w, h: view.h, scale: view.scale, worldW: view.worldW, dpr: view.dpr }; }
+    try {
+      loopBody(ts);
+    } catch (e) {
+      if (debug) { (self.CWErrors = self.CWErrors || []).push('loop: ' + (e && e.message) + (e && e.stack ? ' | ' + String(e.stack).split('\n')[1] : '')); return; }
+      throw e;
+    }
+  }
+  if (debug) self.CWTICK = function (ts) { loopBody(ts); }; // manual pump for automated testing
+  function loopBody(ts) {
     var dtMs = lastFrameTs ? (ts - lastFrameTs) : 16.7;
     lastFrameTs = ts;
     dtMs = clamp(dtMs, 0, 50);
@@ -1851,6 +1872,7 @@ if (typeof document !== 'undefined' && document.getElementById('cw-canvas')) (fu
       pollGamepad(dt);
       game.frame(dtMs);
       var snap = game.snapshot();
+      if (debug && typeof self !== 'undefined') self.CWDBG = snap; // debug probe
       el('hud-score').textContent = String(snap.score);
       var best = parseInt(store.get('cw.best') || '0', 10) || 0;
       el('hud-best').textContent = t('best') + ' ' + Math.max(best, snap.score);
