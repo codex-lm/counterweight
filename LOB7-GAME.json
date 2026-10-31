@@ -1,0 +1,20 @@
+{
+  "title": "Counterweight",
+  "description": "Drop coloured blocks on a balancing plank, melt groups of three, and keep the whole thing from tipping over.",
+  "entrypoint": "index.html",
+  "license": "MIT",
+  "genre": ["puzzle", "arcade"],
+  "themes": ["physics", "balance"],
+  "controls": [
+    "Left/Right or A/D: move",
+    "Up or W: rotate a bar",
+    "Down or Space: drop",
+    "Touch: drag to aim, release to drop"
+  ],
+  "credits": [
+    "Concept: Cédric Bernadac, with Claude",
+    "Game made by Z-Code",
+    "Physics: Matter.js by Liam Brummitt (MIT, inlined)"
+  ],
+  "cover": "cover.png"
+}

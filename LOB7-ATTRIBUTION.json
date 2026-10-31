@@ -1,0 +1,24 @@
+{
+  "schemaVersion": 1,
+  "contributions": [
+    {
+      "name": "Cédric Bernadac",
+      "kind": "person",
+      "status": "included",
+      "summary": "Game concept and full design brief (mechanics, progression, feel)."
+    },
+    {
+      "name": "Claude",
+      "kind": "agent",
+      "status": "included",
+      "summary": "Concept co-writing with Cédric Bernadac, per the game specification credits."
+    },
+    {
+      "name": "Z-Code",
+      "kind": "agent",
+      "status": "included",
+      "summary": "Game made by Z-Code: engine integration, balance physics model, rules, art direction, cover art, synthesized sound, EN/FR/ES localisation, automated test suite."
+    }
+  ],
+  "basedOnReleaseIds": []
+}
